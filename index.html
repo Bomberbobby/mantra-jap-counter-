@@ -150,6 +150,29 @@ input[type=range]{width:100%;accent-color:var(--saffron)}
 .note{font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:12px}
 .note b{color:var(--gold)}
 
+/* tarpan section */
+.sec{margin-top:8px}
+.sechead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sechead .iconbtn{font-size:24px;line-height:1}
+.sechead .iconbtn:disabled{opacity:.3}
+.sect{flex:1;text-align:center}
+.sect b{display:block;font-size:19px}
+.sect span{font-size:12.5px;color:var(--muted)}
+.row{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border-radius:14px;margin-bottom:6px;border:1px solid var(--line);background:var(--panel)}
+.row .no{flex:none;width:34px;font-size:13px;color:var(--faint);font-variant-numeric:tabular-nums;text-align:right;padding-top:3px}
+.row .st{flex:none;width:22px;text-align:center;font-weight:800;padding-top:1px}
+.row .tx{flex:1;min-width:0;font-size:15px;line-height:1.55;color:var(--muted)}
+.row .tx em{font-style:normal;font-weight:700;color:var(--ink)}
+.row.b .tx em{color:var(--saffron)}
+.row.done{opacity:.55}
+.row.done .st{color:var(--ok)}
+.row.cur{border:2px solid var(--saffron2);background:linear-gradient(180deg,#33200f,#26170c);opacity:1}
+.row.cur .tx{font-size:calc(var(--text-size) - 4px);color:#fbeedd}
+.row.cur .st{color:var(--saffron)}
+.row.cur.err{border-color:#d4462f;background:#3d1610}
+.row .kind{display:inline-block;font-size:11px;font-weight:700;padding:0 7px;border-radius:999px;margin-right:6px;vertical-align:2px;background:#4a3020;color:#e9cfae}
+.row.b .kind{background:var(--saffron);color:#2a1205}
+@media (prefers-color-scheme: light){ .row.cur{background:#fff3e2} .row.cur .tx{color:#3a1806} .row.cur.err{background:#ffe7e1} .row .kind{background:#ecd6b8;color:#3a1f10} }
 /* tarpan */
 .tcard{border-color:var(--saffron2);background:linear-gradient(180deg,#3a2210,#2a170c)}
 .tsub{font-size:12px;color:var(--gold);margin-top:4px}
@@ -330,8 +353,14 @@ input[type=range]{width:100%;accent-color:var(--saffron)}
       <div class="tstats"><span>✓ heard right <b id="tOk">0</b></span><span class="bad">✗ mistakes <b id="tBad">0</b></span><span>rounds <b id="tRounds">0</b></span></div>
     </div>
   </div>
-  <div id="tMain">
-    <div class="cur" id="tCur"><div class="tag" id="tTag"></div><div class="ln dev" id="tLine"></div></div>
+  <div id="tMain" class="sec">
+    <div class="sechead">
+      <button class="iconbtn" id="tSecPrev" aria-label="Previous section">‹</button>
+      <div class="sect"><b class="dev" id="tSecTitle"></b><span id="tSecSub"></span></div>
+      <button class="iconbtn" id="tSecNext" aria-label="Next section">›</button>
+    </div>
+    <div id="tRows"></div>
+    <button class="pill ghost hidden" id="tSecBack" style="width:100%;justify-content:center;margin-top:10px">↩ Back to current section</button>
     <div class="nextl dev" id="tNext"></div>
   </div>
   <div class="warn hidden" id="tWarn"></div>
@@ -971,7 +1000,7 @@ function tpAdvance(kind, note){
   const st=STEPS[T.pos];
   T.hist.unshift({n:T.pos+1, s:tpShort(st), r:kind, h:note||''}); T.hist=T.hist.slice(0,40);
   if(kind==='ok') T.ok++;
-  T.pos++; pendingBad=null;
+  T.pos++; pendingBad=null; viewG=null;
   if(T.pos>=444){ T.completed++; vibrate([150,80,150,80,400]); if(listening) stopListening(); }
   else if(STEPS[T.pos].g!==st.g) vibrate([60,60,60]); else vibrate(30);
   save(); renderTarpan(true);
@@ -981,7 +1010,7 @@ function tpMistake(st, heard){
   T.mistakes++;
   T.hist.unshift({n:T.pos+1, s:tpShort(st), r:'bad', h:heard}); T.hist=T.hist.slice(0,40);
   vibrate([250,120,250]);
-  if(!T.stay){ T.pos++; save(); renderTarpan(true); }
+  if(!T.stay){ T.pos++; viewG=null; save(); renderTarpan(true); }
   else { pendingBad={n:T.pos+1, exp:tpShort(st), heard}; save(); renderTarpan(false); }
 }
 
@@ -996,14 +1025,7 @@ function renderTarpan(anim){
   $('#tGrp').textContent=tpGroupLabel(T.pos);
   if(done){ $('#tDoneSum').textContent=`Mistakes caught this round: ${T.mistakes}`; }
   else{
-    const st=STEPS[T.pos], cur=$('#tCur');
-    cur.classList.toggle('mula',st.k==='m');
-    const part = st.g===0 ? `मूल ${st.i+1} / 12` : (st.k==='b' ? `बीज / नाम ${st.i+1} / 4` : `मूल ${st.i-3} / 4`);
-    $('#tTag').textContent=`Line ${T.pos+1} · ${part}`;
-    $('#tLine').innerHTML=tpLineHTML(st);
-    const nx=STEPS[T.pos+1];
-    $('#tNext').innerHTML = nx ? `Next: <b>${T.pos+2}</b> · ${esc(tpShort(nx))}${nx.g!==st.g?' — new group':''}` : 'Last line';
-    if(anim){ cur.classList.remove('bump'); void cur.offsetWidth; cur.classList.add('glow'); setTimeout(()=>cur.classList.remove('glow'),700); }
+    renderSection(anim);
   }
   const w=$('#tWarn');
   if(pendingBad && !done){
@@ -1016,7 +1038,33 @@ function renderTarpan(anim){
   $('#tHist').innerHTML = T.hist.length ? T.hist.map(h=>`<div class="h ${h.r}"><span class="no">${h.n}</span><span class="ic">${h.r==='ok'?'✓':h.r==='bad'?'✗':'•'}</span><span class="tx dev">${esc(h.s)}${h.r==='bad'?' — heard '+esc(h.h):h.r==='man'?' — '+esc(h.h||'manual'):''}</span></div>`).join('')
     : '<div style="color:var(--muted);padding:8px 0">Nothing recited yet.</div>';
 }
+/* one section (group) at a time */
+let viewG=null;                         // null = follow the current line
+const G_COUNT=1+T_ITEMS.length;         // 55 sections
+const secRange=g=> g===0 ? [0,12] : [12+(g-1)*8, 12+g*8];
+function renderSection(anim){
+  const T=tpState(), curG=STEPS[T.pos].g, g=viewG===null?curG:viewG;
+  const [a,b]=secRange(g);
+  $('#tSecTitle').textContent = g===0 ? 'मूल मन्त्र' : 'बीज / नाम: '+T_ITEMS[g-1];
+  const doneIn=Math.max(0,Math.min(b,T.pos)-a);
+  $('#tSecSub').textContent=`Section ${g+1} of ${G_COUNT} · lines ${a+1}–${b} · ${doneIn}/${b-a} done`;
+  $('#tSecPrev').disabled = g<=0; $('#tSecNext').disabled = g>=G_COUNT-1;
+  $('#tSecBack').classList.toggle('hidden', g===curG);
+  let h='';
+  for(let i=a;i<b;i++){
+    const st=STEPS[i], state = i<T.pos ? 'done' : i===T.pos ? 'cur' : 'todo';
+    const err = state==='cur' && pendingBad ? ' err' : '';
+    const icon = state==='done' ? '✓' : state==='cur' ? (pendingBad?'✗':'▶') : '';
+    const kind = st.k==='m' ? 'मूल' : 'बीज';
+    h+=`<div class="row ${st.k} ${state}${err}" ${state==='cur'?'id="tCurRow"':''}><span class="no">${i+1}</span><span class="st">${icon}</span><span class="tx dev"><span class="kind">${kind}</span>${tpLineHTML(st)}</span></div>`;
+  }
+  $('#tRows').innerHTML=h;
+  const nb=secRange(curG)[1];
+  $('#tNext').innerHTML = (g===curG && nb<444) ? `After this section: <b>${esc(STEPS[nb].g===0?'':'बीज / नाम: '+T_ITEMS[STEPS[nb].g-1])}</b> (lines ${nb+1}–${secRange(STEPS[nb].g)[1]})` : '';
+  if(anim && g===curG){ const r=document.getElementById('tCurRow'); if(r){ r.classList.add('glow'); try{ r.scrollIntoView({behavior:'smooth',block:'center'}); }catch(e){} } }
+}
 function openTarpan(){
+  viewG=null;
   const T=tpState(); tp.active=true; cur=null;
   tbuf=[]; trailer=false; tFinalShown=''; pendingBad=null;
   $('#listView').classList.add('hidden'); $('#chantView').classList.add('hidden'); $('#tarpanView').classList.remove('hidden');
@@ -1031,13 +1079,16 @@ function closeTarpan(){
   tp.active=false; $('#tarpanView').classList.add('hidden'); $('#listView').classList.remove('hidden'); renderList();
 }
 $('#tBack').onclick=closeTarpan;
+$('#tSecPrev').onclick=()=>{ const T=tpState(); const g=(viewG===null?STEPS[T.pos].g:viewG)-1; if(g>=0){ viewG=g; renderSection(false); } };
+$('#tSecNext').onclick=()=>{ const T=tpState(); const g=(viewG===null?STEPS[T.pos].g:viewG)+1; if(g<G_COUNT){ viewG=g; renderSection(false); } };
+$('#tSecBack').onclick=()=>{ viewG=null; renderSection(true); };
 $('#tNextBtn').onclick=()=>{ tpAdvance('man','tapped'); };
 $('#tPrev').onclick=()=>{ const T=tpState(); if(T.pos>0){ T.pos--; pendingBad=null; T.hist.unshift({n:T.pos+1,s:tpShort(STEPS[T.pos]),r:'man',h:'went back'}); save(); renderTarpan(false); } };
 $('#tAgain').onclick=()=>{ const T=tpState(); T.pos=0; T.ok=0; T.mistakes=0; T.hist=[]; save(); renderTarpan(false); };
 $('#tStrict').onchange=e=>{ tpState().strict=e.target.checked; save(); };
 $('#tStay').onchange=e=>{ tpState().stay=e.target.checked; save(); };
 $('#tLang').onchange=e=>{ S.settings.lang=e.target.value; $('#langIn').value=e.target.value; save(); if(listening) toast('Language applies next time you start listening'); };
-$('#tJumpGo').onclick=()=>{ const n=parseInt($('#tJump').value,10); if(!(n>=1&&n<=444)){ toast('Enter a line from 1 to 444'); return; } const T=tpState(); T.pos=n-1; pendingBad=null; save(); renderTarpan(false); toast('Now at line '+n); };
+$('#tJumpGo').onclick=()=>{ const n=parseInt($('#tJump').value,10); if(!(n>=1&&n<=444)){ toast('Enter a line from 1 to 444'); return; } const T=tpState(); T.pos=n-1; pendingBad=null; viewG=null; save(); renderTarpan(true); toast('Now at line '+n); };
 $('#tSizeBtn').onclick=()=>{ S.settings.size = S.settings.size>=34 ? 18 : S.settings.size+4; setTextSize(); save(); };
 $('#tRestart').onclick=()=>{
   openSheet(`<h3>Restart the tarpan?</h3><p style="color:var(--muted);margin-top:-6px">Progress (${tpState().pos}/444) and this round's mistake count will be cleared.</p>
